@@ -25,6 +25,37 @@ void parseCommand(char* command, char** arguments, int* numArgs) {
             token++; // Move past the opening quote
         }
 
+        // Process nested quotes
+        if (token[0] == '"' && token[len - 1] != '"') {
+            // Nested double quotes, concatenate tokens until closing quote is found
+            char* nestedToken;
+            while ((nestedToken = strtok_r(NULL, "\"", &command))) {
+                int nestedLen = strlen(nestedToken);
+                if (nestedToken[nestedLen - 1] == '"') {
+                    nestedToken[nestedLen - 1] = '\0'; // Remove the closing quote
+                    break;
+                }
+                len += nestedLen;
+                token = realloc(token, (len + 1) * sizeof(char));
+                strcat(token, " ");
+                strcat(token, nestedToken);
+            }
+        } else if (token[0] == '\'' && token[len - 1] != '\'') {
+            // Nested single quotes, concatenate tokens until closing quote is found
+            char* nestedToken;
+            while ((nestedToken = strtok_r(NULL, "'", &command))) {
+                int nestedLen = strlen(nestedToken);
+                if (nestedToken[nestedLen - 1] == '\'') {
+                    nestedToken[nestedLen - 1] = '\0'; // Remove the closing quote
+                    break;
+                }
+                len += nestedLen;
+                token = realloc(token, (len + 1) * sizeof(char));
+                strcat(token, " ");
+                strcat(token, nestedToken);
+            }
+        }
+
         // Process escape characters
         char* arg = malloc((len + 1) * sizeof(char));
         int j = 0;
@@ -56,6 +87,7 @@ void parseCommand(char* command, char** arguments, int* numArgs) {
     arguments[i] = NULL;
     *numArgs = i;
 }
+
 
 // Function to expand variables in arguments
 void expandVariables(char** arguments, int numArgs) {
