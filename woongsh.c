@@ -8,59 +8,47 @@
 #define MAX_COMMAND_LENGTH 1024
 #define MAX_ARGUMENTS 64
 
+// Helper function to check if a character is a quote
+int isQuote(char c) {
+    return c == '"' || c == '\'';
+}
+
+// Recursive function to parse tokens with nested quotes
+char* parseNestedQuotes(char* token) {
+    int len = strlen(token);
+
+    // Check for quotes at the beginning and end of the token
+    if (isQuote(token[0]) && token[len - 1] == token[0]) {
+        token[len - 1] = '\0'; // Remove the closing quote
+        token++; // Move past the opening quote
+        return token;
+    }
+
+    // Process nested quotes
+    if (isQuote(token[0]) && token[len - 1] != token[0]) {
+        // Find the closing quote
+        char* nestedEnd = strchr(token + 1, token[0]);
+        if (nestedEnd != NULL) {
+            *nestedEnd = '\0'; // Remove the closing quote
+            return nestedEnd + 1; // Move to the next token
+        }
+    }
+
+    return token;
+}
+
 // Function to parse the input command
 void parseCommand(char* command, char** arguments, int* numArgs) {
     char* token;
     int i = 0;
-    int inQuotes = 0; // Flag to track if inside quotes
     int escape = 0; // Flag to track if escape character encountered
 
     while ((token = strtok_r(command, " \t\n", &command))) {
-        int len = strlen(token);
-
-        // Check for quotes at the beginning and end of the token
-        if ((token[0] == '"' && token[len - 1] == '"') ||
-            (token[0] == '\'' && token[len - 1] == '\'')) {
-            token[len - 1] = '\0'; // Remove the closing quote
-            token++; // Move past the opening quote
-        }
-
-        // Process nested quotes
-        if (token[0] == '"' && token[len - 1] != '"') {
-            // Nested double quotes, concatenate tokens until closing quote is found
-            char* nestedToken;
-            while ((nestedToken = strtok_r(NULL, "\"", &command))) {
-                int nestedLen = strlen(nestedToken);
-                if (nestedToken[nestedLen - 1] == '"') {
-                    nestedToken[nestedLen - 1] = '\0'; // Remove the closing quote
-                    break;
-                }
-                len += nestedLen;
-                token = realloc(token, (len + 1) * sizeof(char));
-                strcat(token, " ");
-                strcat(token, nestedToken);
-            }
-        } else if (token[0] == '\'' && token[len - 1] != '\'') {
-            // Nested single quotes, concatenate tokens until closing quote is found
-            char* nestedToken;
-            while ((nestedToken = strtok_r(NULL, "'", &command))) {
-                int nestedLen = strlen(nestedToken);
-                if (nestedToken[nestedLen - 1] == '\'') {
-                    nestedToken[nestedLen - 1] = '\0'; // Remove the closing quote
-                    break;
-                }
-                len += nestedLen;
-                token = realloc(token, (len + 1) * sizeof(char));
-                strcat(token, " ");
-                strcat(token, nestedToken);
-            }
-        }
-
         // Process escape characters
-        char* arg = malloc((len + 1) * sizeof(char));
+        char* arg = malloc((strlen(token) + 1) * sizeof(char));
         int j = 0;
 
-        for (int k = 0; k < len; k++) {
+        for (int k = 0; token[k] != '\0'; k++) {
             if (escape) {
                 // Handle escape character
                 if (token[k] == 'n')
@@ -80,8 +68,50 @@ void parseCommand(char* command, char** arguments, int* numArgs) {
         }
 
         arg[j] = '\0';
+
+        // Recursively handle nested quotes
+        char* nextToken = parseNestedQuotes(arg);
+
         arguments[i] = arg;
         i++;
+
+        // Process the remaining tokens
+        while (nextToken != NULL && i < MAX_ARGUMENTS - 1) {
+            nextToken = strtok_r(nextToken, " \t\n", &nextToken);
+
+            if (nextToken != NULL) {
+                // Process escape characters
+                char* arg = malloc((strlen(nextToken) + 1) * sizeof(char));
+                int j = 0;
+
+                for (int k = 0; nextToken[k] != '\0'; k++) {
+                    if (escape) {
+                        // Handle escape character
+                        if (nextToken[k] == 'n')
+                            arg[j++] = '\n';
+                        else if (nextToken[k] == 't')
+                            arg[j++] = '\t';
+                        else
+                            arg[j++] = nextToken[k];
+
+                        escape = 0; // Reset escape flag
+                    } else if (nextToken[k] == '\\') {
+                        // Set escape flag for next character
+                        escape = 1;
+                    } else {
+                        arg[j++] = nextToken[k];
+                    }
+                }
+
+                arg[j] = '\0';
+
+                // Recursively handle nested quotes
+                nextToken = parseNestedQuotes(arg);
+
+                arguments[i] = arg;
+                i++;
+            }
+        }
     }
 
     arguments[i] = NULL;
