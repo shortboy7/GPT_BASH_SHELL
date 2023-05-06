@@ -10,12 +10,46 @@
 
 // Function to parse the input command
 void parseCommand(char* command, char** arguments, int* numArgs) {
-    char* token = strtok(command, " \t\n");
+    char* token;
     int i = 0;
+    int inQuotes = 0; // Flag to track if inside quotes
+    int escape = 0; // Flag to track if escape character encountered
 
-    while (token != NULL && i < MAX_ARGUMENTS - 1) {
-        arguments[i] = token;
-        token = strtok(NULL, " \t\n");
+    while ((token = strtok_r(command, " \t\n", &command))) {
+        int len = strlen(token);
+
+        // Check for quotes at the beginning and end of the token
+        if ((token[0] == '"' && token[len - 1] == '"') ||
+            (token[0] == '\'' && token[len - 1] == '\'')) {
+            token[len - 1] = '\0'; // Remove the closing quote
+            token++; // Move past the opening quote
+        }
+
+        // Process escape characters
+        char* arg = malloc((len + 1) * sizeof(char));
+        int j = 0;
+
+        for (int k = 0; k < len; k++) {
+            if (escape) {
+                // Handle escape character
+                if (token[k] == 'n')
+                    arg[j++] = '\n';
+                else if (token[k] == 't')
+                    arg[j++] = '\t';
+                else
+                    arg[j++] = token[k];
+
+                escape = 0; // Reset escape flag
+            } else if (token[k] == '\\') {
+                // Set escape flag for next character
+                escape = 1;
+            } else {
+                arg[j++] = token[k];
+            }
+        }
+
+        arg[j] = '\0';
+        arguments[i] = arg;
         i++;
     }
 
