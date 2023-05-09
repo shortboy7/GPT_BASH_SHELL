@@ -77,47 +77,45 @@ void parseCommand(char* command, char** arguments, int* numArgs) {
 
         // Process the remaining tokens
         while (nextToken != NULL && i < MAX_ARGUMENTS - 1) {
-            nextToken = strtok_r(nextToken, " \t\n", &nextToken);
+            // Reset escape flag for the nested token
+            escape = 0;
 
-            if (nextToken != NULL) {
-                // Process escape characters
-                char* arg = malloc((strlen(nextToken) + 1) * sizeof(char));
-                int j = 0;
+            // Process escape characters
+            char* nestedArg = malloc((strlen(nextToken) + 1) * sizeof(char));
+            int j = 0;
 
-                for (int k = 0; nextToken[k] != '\0'; k++) {
-                    if (escape) {
-                        // Handle escape character
-                        if (nextToken[k] == 'n')
-                            arg[j++] = '\n';
-                        else if (nextToken[k] == 't')
-                            arg[j++] = '\t';
-                        else
-                            arg[j++] = nextToken[k];
+            for (int k = 0; nextToken[k] != '\0'; k++) {
+                if (escape) {
+                    // Handle escape character
+                    if (nextToken[k] == 'n')
+                        nestedArg[j++] = '\n';
+                    else if (nextToken[k] == 't')
+                        nestedArg[j++] = '\t';
+                    else
+                        nestedArg[j++] = nextToken[k];
 
-                        escape = 0; // Reset escape flag
-                    } else if (nextToken[k] == '\\') {
-                        // Set escape flag for next character
-                        escape = 1;
-                    } else {
-                        arg[j++] = nextToken[k];
-                    }
+                    escape = 0; // Reset escape flag
+                } else if (nextToken[k] == '\\') {
+                    // Set escape flag for next
+										escape = 1;
+                } else {
+                    nestedArg[j++] = nextToken[k];
                 }
-
-                arg[j] = '\0';
-
-                // Recursively handle nested quotes
-                nextToken = parseNestedQuotes(arg);
-
-                arguments[i] = arg;
-                i++;
             }
+
+            nestedArg[j] = '\0';
+
+            // Recursively handle nested quotes
+            nextToken = parseNestedQuotes(nestedArg);
+
+            arguments[i] = nestedArg;
+            i++;
         }
     }
 
     arguments[i] = NULL;
     *numArgs = i;
 }
-
 
 // Function to expand variables in arguments
 void expandVariables(char** arguments, int numArgs) {
